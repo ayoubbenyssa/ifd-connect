@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "528286061605",
+    "firebase_url": "https://ifd-connect-4b5ba-default-rtdb.firebaseio.com",
+    "project_id": "ifd-connect-4b5ba",
+    "storage_bucket": "ifd-connect-4b5ba.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:528286061605:android:445185b13bb9453cc21bcc",
+        "android_client_info": {
+          "package_name": "com.linkommunity.ifd"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "528286061605-k8h4jt4bjmcqddcf4cngg2hmr9b2m9oo.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC20NNAPcMo9ERPKVsMlhM4zrdsUkcx674"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "528286061605-k8h4jt4bjmcqddcf4cngg2hmr9b2m9oo.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "528286061605-4r41lf730qsii5fo4g10aflamm76f0pj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.linkommunity.ifd"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

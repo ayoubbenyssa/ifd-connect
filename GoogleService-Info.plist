@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>528286061605-4r41lf730qsii5fo4g10aflamm76f0pj.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.528286061605-4r41lf730qsii5fo4g10aflamm76f0pj</string>
+	<key>API_KEY</key>
+	<string>AIzaSyD9va6V-np8uoKLJ80E6n__GxJmvicNq7U</string>
+	<key>GCM_SENDER_ID</key>
+	<string>528286061605</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.linkommunity.ifd</string>
+	<key>PROJECT_ID</key>
+	<string>ifd-connect-4b5ba</string>
+	<key>STORAGE_BUCKET</key>
+	<string>ifd-connect-4b5ba.appspot.com</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:528286061605:ios:ffa53dec301b2b29c21bcc</string>
+	<key>DATABASE_URL</key>
+	<string>https://ifd-connect-4b5ba-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>

@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:ifdconnect/config/config.dart';
 import 'package:ifdconnect/models/Mealcal.dart';
+import 'package:ifdconnect/restauration/servcies/localstorage_services.dart';
 import 'package:ifdconnect/services/Fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:ifdconnect/models/meal.dart';
@@ -29,8 +30,13 @@ class Myreservations extends StatefulWidget {
 class _MesReservationState extends State<Myreservations> {
   final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
   var reservationData;
+  var annulationData;
   var dataDay;
   var data;
+  var data0;
+  var data0TimeInterval;
+  Map dataMap;
+  // var data2;
   List meals = [];
   List listmeals = [];
   bool loading = true;
@@ -41,6 +47,11 @@ class _MesReservationState extends State<Myreservations> {
   List listKey = [];
   bool wait = false;
 
+  LocalStorageServices storage = LocalStorageServices();
+  // String _tableName = "meals_reserve";
+  String _tableName = "meals";
+  String _tableName1 = "allmeals";
+  // String _tableName2 = "meals";
   List<Meal> _list = [];
   SlidableController ctrl;
   int i = 0;
@@ -77,10 +88,373 @@ class _MesReservationState extends State<Myreservations> {
     );
     setState(() {
       data = json.decode(reservationsData.body);
+      annulationData = data;
+      loading = false;
     });
 
     return reservationsData;
   }
+
+  // fetch services from sqlite
+  Future<String> _fetchMealsFromSharedPreferences() async {
+    return await storage.getDataFromSharedPreferences(table: _tableName);
+  }
+
+  // fetch services from sqlite
+  Future<String> _fetchAllMealsFromSharedPreferences() async {
+    return await storage.getDataFromSharedPreferences(table: _tableName1);
+  }
+  // Future<String> _fetchAllMeals2FromSharedPreferences() async {
+  //   return await storage.getDataFromSharedPreferences(table: _tableName2);
+  // }
+
+  Future<List<Meal>> get_meals(int user_id, int student_id, int token) async {
+    final resStorage = await _fetchAllMealsFromSharedPreferences();
+
+    if (resStorage != null) {
+      List list = json.decode(resStorage);
+      return list.map((contactRaw) => new Meal.fromDoc(contactRaw)).toList();
+    } else {
+      return await get_meals_fromapi(user_id, student_id, token);
+    }
+  }
+
+  Future<List<Meal>> get_meals_fromapi(
+      int user_id, int student_id, int token) async {
+    final param = {
+      "user_id": "$user_id",
+      "student_id": "$student_id",
+      "auth_token": "$token",
+    };
+
+    final reservationsData = await http.post(
+      "${Config.url_api}/meals",
+      body: param,
+    );
+
+    var rrr = await storage.saveDataToSharedPrefrences(
+      data: json.encode(json.decode(reservationsData.body)["meals"]),
+      table: _tableName1,
+    );
+    List list = [];
+    if (this.mounted) {
+      setState(() {
+        list = json.decode(reservationsData.body)["meals"];
+      });
+    }
+
+    return list.map((contactRaw) => new Meal.fromDoc(contactRaw)).toList();
+  }
+
+  //service pour réserver un repas
+  Future<http.Response> makeReservationConf(
+      int user_id, int student_id, int token, String pmIds) async {
+    setState(() {
+      loading = true;
+    });
+    final param = {
+      "user_id": "$user_id",
+      "student_id": "$student_id",
+      "auth_token": "$token",
+      "pm_ids": "$pmIds",
+    };
+
+    final restoData = await http.post(
+      "${Config.url_api}/make_reservation",
+      body: param,
+    );
+
+    setState(() {
+      reservationData = json.decode(restoData.body);
+      loading = false;
+    });
+
+    if (reservationData["result"] == false) {
+      _showDialog();
+    }
+
+    return restoData;
+  }
+
+  Future<http.Response> getMealsDay(int user_id, int student_id, int token,
+      String start_date, String end_date) async {
+    final param = {
+      "user_id": "$user_id",
+      "student_id": "$student_id",
+      "auth_token": "$token",
+      "start_date": "$start_date",
+      "end_date": "$end_date",
+      "is_result": "1"
+    };
+
+    final mealsData = await http.post(
+      "${Config.url_api}/all_meals_calendar",
+      body: param,
+    );
+    setState(() {
+      dataDay = json.decode(mealsData.body);
+    });
+
+    var rrr = await storage.saveDataToSharedPrefrences(
+      data: mealsData.body,
+      table: _tableName,
+    );
+
+    /* Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => AllMealsCalendar(
+                dataDay, widget._userId, widget._studentId, widget._token)));*/
+
+    return mealsData;
+  }
+
+  Future<http.Response> getMeals(int user_id, int student_id, int token,
+      String start_date, String end_date) async {
+
+    print("@@@@@@@@@@@@@@@@@@@@@");
+    final loadData = await storage.getBooleanDataFromSharedPreferences(
+        table: "resto_api_check");
+    final resStorage = await _fetchMealsFromSharedPreferences();
+    // final resStorage2 = await _fetchMyMealsFromSharedPreferences();
+    // final date = await storage.getDataFromSharedPreferences(
+    //     table: "resto_api_check_date");
+    // final dateD = await storage.getDataFromSharedPreferences(
+    //     table:
+    //         "resto_api_date_debut"); /*date_deb des données enregistrées localement */
+    final dateF =
+    await storage.getDataFromSharedPreferences(table: "resto_api_date_fin");
+    if (dateF != null) {
+      date_fin = dateF;
+      end_date = date_fin;
+    }
+    // if(date!=null){
+    //   if(DateTime.parse(date.substring(0,10)).difference(DateTime.parse(date_fin)).inDays>0) {
+    //     date_fin = date.substring(0, 10);
+    //     end_date = date_fin;
+    //   }
+    // }
+
+    // if (resStorage2 != null) {
+    //   data2 = json.decode(resStorage2);
+    // }
+
+    // if (false) {
+    String timeIntervalEarly;
+    String timeIntervalLate;
+    List midTimeIntervals = [];
+    int ext1;
+    int ext2;
+    if (resStorage != null && loadData == false) {
+      dataMap = json.decode(resStorage);
+    } else
+      dataMap = {};
+
+    for (String key in dataMap.keys) {
+      List dates = key.split(',');
+      print(dates);
+      if (DateTime.parse(dates[0])
+          .difference(DateTime.parse(date_deb))
+          .inDays <=
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(date_fin))
+              .inDays >=
+              0) {
+        // best case
+        timeIntervalEarly = key;
+        ext1 = ext2 = 0;
+        break;
+      } else if (DateTime.parse(dates[0])
+          .difference(DateTime.parse(date_deb))
+          .inDays <=
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(date_deb))
+              .inDays >=
+              0) {
+        timeIntervalEarly = key;
+        ext1 = 1;
+      } else if (DateTime.parse(dates[0])
+          .difference(DateTime.parse(addDays(date_deb, 31)))
+          .inDays <=
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(addDays(date_deb, 31)))
+              .inDays >=
+              0) {
+        timeIntervalLate = key;
+        ext2 = 1;
+      }
+      if (DateTime.parse(dates[0]).difference(DateTime.parse(date_deb)).inDays >
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(addDays(date_deb, 31)))
+              .inDays <
+              0) {
+        midTimeIntervals.add(key);
+      }
+    }
+
+    if (ext1 != null && ext2 != null && ext1 == 0 && ext2 == 0) {
+      print('scenario 1');
+      data = dataMap[timeIntervalEarly];
+      data0 = data;
+      data0TimeInterval = timeIntervalEarly;
+    } else if (ext1 != null && ext2 == null && ext1 == 1) {
+      print('scenario 2');
+      List dates = timeIntervalEarly.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, dates[1], addDays(date_deb, 31));
+      // combine with dataMap[timeIntervalEarly]
+      dataMap['${dates[0]},${addDays(date_deb, 31)}'] = {
+        'result': dataMap[timeIntervalEarly]['result'] +
+            json.decode(halfData.body)['result']
+      };
+      dataMap.remove(timeIntervalEarly);
+      data = dataMap['${dates[0]},${addDays(date_deb, 31)}'];
+      data0 = data;
+      data0TimeInterval = '${dates[0]},${addDays(date_deb, 31)}';
+    } else if (ext1 == null && ext2 != null && ext2 == 1) {
+      print('scenario 3');
+      List dates = timeIntervalLate.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, date_deb, dates[0]);
+      // combine with dataMap[timeIntervalLate]
+      dataMap['${date_deb},${dates[1]}'] = {
+        'result': json.decode(halfData.body)['result'] +
+            dataMap[timeIntervalLate]['result']
+      };
+      dataMap.remove(timeIntervalLate);
+      data = dataMap['${date_deb},${dates[1]}'];
+      data0 = data;
+      data0TimeInterval = '${date_deb},${dates[1]}';
+    } else if (ext1 == null && ext2 == null) {
+      print('scenario 4');
+      var encodedData = await getMealsFromAPi2(
+          user_id, student_id, token, date_deb, addDays(date_deb, 31));
+      dataMap['${date_deb},${addDays(date_deb, 31)}'] =
+          json.decode(encodedData.body);
+      data = dataMap['${date_deb},${addDays(date_deb, 31)}'];
+      data0 = data;
+      data0TimeInterval = "$date_deb,${addDays(date_deb, 31)}";
+    } else if (ext1 == 1 && ext2 == 1) {
+      print('scenario 5');
+      List dates = timeIntervalEarly.split(',');
+      List dates2 = timeIntervalLate.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, dates[1], dates2[0]);
+      // combine with dataMap[timeIntervalEarly] and dataMap[timeIntervalLate]
+      dataMap['${dates[0]},${dates2[1]}'] = {
+        'result': dataMap[timeIntervalEarly]['result'] +
+            json.decode(halfData.body)['result'] +
+            dataMap[timeIntervalLate]['result']
+      };
+      dataMap.remove(timeIntervalEarly);
+      dataMap.remove(timeIntervalLate);
+      data = dataMap['${dates[0]},${dates2[1]}'];
+      data0 = data;
+      data0TimeInterval = '${dates[0]},${dates2[1]}';
+    }
+
+    for (var elmnt in midTimeIntervals) {
+      print('scenario mid');
+      // remove dataMap[elmnt] from dataMap
+      dataMap.remove(elmnt);
+    }
+    await storage.saveDataToSharedPrefrences(
+      data: json.encode(dataMap),
+      table: _tableName,
+    );
+
+    //
+
+    // if (resStorage != null &&
+    //     loadData == false &&
+    //     dateD == date_deb &&
+    //     !(date != null &&
+    //         DateTime.parse(date.substring(0, 10))
+    //                 .difference(DateTime.parse(dateF))
+    //                 .inDays >
+    //             0)) {
+    //   print('yaasalam');
+    //   data = json.decode(resStorage);
+    //   data0 = data;
+    //   return null;
+    // } else {
+    //   print('yaasalam2');
+    //   if (date != null) {
+    //     if (DateTime.parse(date.substring(0, 10))
+    //             .difference(DateTime.parse(date_fin))
+    //             .inDays >
+    //         0) {
+    //       date_fin = date.substring(0, 10);
+    //       end_date = date_fin;
+    //     }
+    //   }
+    //   return await getMealsFromAPi(
+    //       user_id, student_id, token, start_date, addDays(date_fin, 31));
+    // }
+  }
+
+  Future<http.Response> getMealsFromAPi2(int user_id, int student_id, int token,
+      String start_date, String end_date) async {
+    final param = {
+      "user_id": "$user_id",
+      "student_id": "$student_id",
+      "auth_token": "$token",
+      "start_date": "$start_date",
+      "end_date": "$end_date",
+      "meal_id": "all",
+      "is_reserved": "all"
+    };
+
+    print("start_date == ${start_date}");
+    print("end_date == ${end_date}");
+
+
+    final mealsData = await http.post(
+      "${Config.url_api}/all_meals_calendar",
+      body: param,
+    );
+    return mealsData;
+  }
+
+  Future<http.Response> getMealsFromAPi(int user_id, int student_id, int token,
+      String start_date, String end_date) async {
+    final param = {
+      "user_id": "$user_id",
+      "student_id": "$student_id",
+      "auth_token": "$token",
+      "start_date": "$start_date",
+      "end_date": "$end_date",
+      "meal_id": "all",
+      "is_result": "1"
+    };
+
+    final mealsData = await http.post(
+      "${Config.url_api}/all_meals_calendar",
+      body: param,
+    );
+
+    await storage.saveDataToSharedPrefrences(
+      data: mealsData.body,
+      table: _tableName,
+    );
+
+    if (this.mounted)
+      setState(() {
+        data = json.decode(mealsData.body);
+      });
+    data0=data;
+    storage.saveBooleanDataToSharedPrefrences(table: "resto_api_check", data: false);
+    storage.saveDataToSharedPrefrences(table: "resto_api_date_debut", data: date_deb);
+    storage.saveDataToSharedPrefrences(table: "resto_api_date_fin", data: date_fin);
+
+    return mealsData;
+  }
+
+
   bool test22 = false ;
 
   widget_checkboxlist(title, value){
@@ -157,52 +531,52 @@ class _MesReservationState extends State<Myreservations> {
     );
   }
 
-  Future<List<Meal>> get_meals(int user_id, int student_id, int token) async {
-    final param = {
-      "user_id": "$user_id",
-      "student_id": "$student_id",
-      "auth_token": "$token",
-    };
-
-    final reservationsData = await http.post(
-      "${Config.url_api}/meals",
-      body: param,
-    );
-    List list = [];
-    if (this.mounted) {
-      setState(() {
-        list = json.decode(reservationsData.body)["meals"];
-      });
-    }
-
-    return list.map((contactRaw) => new Meal.fromDoc(contactRaw)).toList();
-  }
+  // Future<List<Meal>> get_meals(int user_id, int student_id, int token) async {
+  //   final param = {
+  //     "user_id": "$user_id",
+  //     "student_id": "$student_id",
+  //     "auth_token": "$token",
+  //   };
+  //
+  //   final reservationsData = await http.post(
+  //     "${Config.url_api}/meals",
+  //     body: param,
+  //   );
+  //   List list = [];
+  //   if (this.mounted) {
+  //     setState(() {
+  //       list = json.decode(reservationsData.body)["meals"];
+  //     });
+  //   }
+  //
+  //   return list.map((contactRaw) => new Meal.fromDoc(contactRaw)).toList();
+  // }
 
   //service pour réserver un repas
-  Future<http.Response> makeReservationConf(
-      int user_id, int student_id, int token, String pmIds) async {
-    final param = {
-      "user_id": "$user_id",
-      "student_id": "$student_id",
-      "auth_token": "$token",
-      "pm_ids": "$pmIds",
-    };
-
-    final restoData = await http.post(
-      "${Config.url_api}/make_reservation",
-      body: param,
-    );
-
-    setState(() {
-      reservationData = json.decode(restoData.body);
-    });
-
-    if (reservationData["result"] == false) {
-      _showDialog();
-    }
-
-    return restoData;
-  }
+  // Future<http.Response> makeReservationConf(
+  //     int user_id, int student_id, int token, String pmIds) async {
+  //   final param = {
+  //     "user_id": "$user_id",
+  //     "student_id": "$student_id",
+  //     "auth_token": "$token",
+  //     "pm_ids": "$pmIds",
+  //   };
+  //
+  //   final restoData = await http.post(
+  //     "${Config.url_api}/make_reservation",
+  //     body: param,
+  //   );
+  //
+  //   setState(() {
+  //     reservationData = json.decode(restoData.body);
+  //   });
+  //
+  //   if (reservationData["result"] == false) {
+  //     _showDialog();
+  //   }
+  //
+  //   return restoData;
+  // }
 
   void _showDialog() {
     showDialog(
@@ -248,70 +622,71 @@ class _MesReservationState extends State<Myreservations> {
     // flutter defined function
   }
 
-  Future<http.Response> getMealsDay(int user_id, int student_id, int token,
-      String start_date, String end_date) async {
-    final param = {
-      "user_id": "$user_id",
-      "student_id": "$student_id",
-      "auth_token": "$token",
-      "start_date": "$start_date",
-      "end_date": "$end_date",
-      "is_result": "1"
-    };
-
-    final mealsData = await http.post(
-      "${Config.url_api}/all_meals_calendar_listi",
-      body: param,
-    );
-    setState(() {
-      dataDay = json.decode(mealsData.body);
-    });
-
-    /* Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (context) => AllMealsCalendar(
-                dataDay, widget._userId, widget._studentId, widget._token)));*/
-
-    return mealsData;
-  }
-
-  Future<http.Response> getMeals(int user_id, int student_id, int token,
-      String start_date, String end_date) async {
-    final param = {
-      "user_id": "$user_id",
-      "student_id": "$student_id",
-      "auth_token": "$token",
-      "start_date": "$start_date",
-      "end_date": "$end_date",
-      "meal_id": "all",
-      "is_result": "1"
-    };
-
-    final mealsData = await http.post(
-      "${Config.url_api}/all_meals_calendar_listi",
-      body: param,
-    );
-    print("==========================");
-    print(mealsData.body);
-    print("==========================");
-
-
-    if (this.mounted)
-      setState(() {
-        data = json.decode(mealsData.body);
-      });
-
-    return mealsData;
-  }
+  // Future<http.Response> getMealsDay(int user_id, int student_id, int token,
+  //     String start_date, String end_date) async {
+  //   final param = {
+  //     "user_id": "$user_id",
+  //     "student_id": "$student_id",
+  //     "auth_token": "$token",
+  //     "start_date": "$start_date",
+  //     "end_date": "$end_date",
+  //     "is_result": "1"
+  //   };
+  //
+  //   final mealsData = await http.post(
+  //     "${Config.url_api}/all_meals_calendar_listi",
+  //     body: param,
+  //   );
+  //   setState(() {
+  //     dataDay = json.decode(mealsData.body);
+  //   });
+  //
+  //   /* Navigator.push(
+  //       context,
+  //       MaterialPageRoute(
+  //           builder: (context) => AllMealsCalendar(
+  //               dataDay, widget._userId, widget._studentId, widget._token)));*/
+  //
+  //   return mealsData;
+  // }
+  //
+  // Future<http.Response> getMeals(int user_id, int student_id, int token,
+  //     String start_date, String end_date) async {
+  //   final param = {
+  //     "user_id": "$user_id",
+  //     "student_id": "$student_id",
+  //     "auth_token": "$token",
+  //     "start_date": "$start_date",
+  //     "end_date": "$end_date",
+  //     "meal_id": "all",
+  //     "is_result": "1"
+  //   };
+  //
+  //   final mealsData = await http.post(
+  //     "${Config.url_api}/all_meals_calendar_listi",
+  //     body: param,
+  //   );
+  //   print("==========================");
+  //   print(mealsData.body);
+  //   print("==========================");
+  //
+  //
+  //   if (this.mounted)
+  //     setState(() {
+  //       data = json.decode(mealsData.body);
+  //     });
+  //
+  //   return mealsData;
+  // }
 
   getMealsCal() {
     for (var i = 0; i < data["result"].length; i++) {
-
       for (var key in data["result"][i].keys) {
         meals = [];
         for (var j = 0; j < data["result"][i][key].length; j++) {
           date = data["result"][i][key][j]["start_date"];
+          if(DateTime.parse(date).difference(DateTime.parse(date_deb)).inDays<0 || DateTime.parse(date).difference(DateTime.parse(date_fin)).inDays>0) break;
+          if(name_repas!=null && name_repas!="Tout" && name_repas != data["result"][i][key][j]["meal"]) break;
           print(date);
           List test = [];
           mealsTrue = [];
@@ -391,14 +766,19 @@ class _MesReservationState extends State<Myreservations> {
       onSlideIsOpenChanged: handleSlideIsOpenChanged,
     );
     String today = DateTime.now().add(new Duration(days: 1)).toString();
+    print("initState");
 
     getMeals(
         widget._userId,
         widget._studentId,
         widget._token,
-        new DateFormat('yyyy-MM-dd')
-            .format(new DateTime.now().add(new Duration(days: -90))),
-        addDays(today, 200))
+        // new DateFormat('yyyy-MM-dd')
+        //     .format(new DateTime.now().add(new Duration(days: -90))),
+        // addDays(today, 200))
+        date_deb,
+        // new DateFormat('yyyy-MM-dd')
+        //     .format(new DateTime.now()),
+        addDays(date_fin, 0))
         .then((_) {
       getMealsCal();
     });
@@ -423,9 +803,13 @@ class _MesReservationState extends State<Myreservations> {
         widget._userId,
         widget._studentId,
         widget._token,
-        new DateFormat('yyyy-MM-dd')
-            .format(new DateTime.now().add(new Duration(days: 1))),
-        addDays(today, 200))
+        // new DateFormat('yyyy-MM-dd')
+        //     .format(new DateTime.now().add(new Duration(days: 1))),
+        // addDays(today, 200))
+        date_deb,
+        // new DateFormat('yyyy-MM-dd')
+        //     .format(new DateTime.now()),
+        addDays(date_fin, 0))
         .then((_) {
       getMealsCal();
     });
@@ -493,6 +877,168 @@ class _MesReservationState extends State<Myreservations> {
     return mealsData;
   }
 
+  Future get__Meals2(int user_id, int student_id, int token,
+      String start_date, String end_date, sel_id) async {
+    meals = [];
+    listmeals = [];
+    mealsmap = new SplayTreeMap<String, Object>();
+    mealsTrue = [];
+    listKey = [];
+
+    String timeIntervalEarly;
+    String timeIntervalLate;
+    List midTimeIntervals = [];
+    int ext1;
+    int ext2;
+
+    for (String key in dataMap.keys) {
+      List dates = key.split(',');
+      if (DateTime.parse(dates[0])
+          .difference(DateTime.parse(date_deb))
+          .inDays <=
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(date_fin))
+              .inDays >=
+              0) {
+        // best case
+        timeIntervalEarly = key;
+        ext1 = ext2 = 0;
+        break;
+      } else if (DateTime.parse(dates[0])
+          .difference(DateTime.parse(date_deb))
+          .inDays <=
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(date_deb))
+              .inDays >=
+              0) {
+        timeIntervalEarly = key;
+        ext1 = 1;
+      } else if (DateTime.parse(dates[0])
+          .difference(DateTime.parse(date_fin))
+          .inDays <=
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(date_fin))
+              .inDays >=
+              0) {
+        timeIntervalLate = key;
+        ext2 = 1;
+      }
+      if (DateTime.parse(dates[0]).difference(DateTime.parse(date_deb)).inDays >
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(date_fin))
+              .inDays <
+              0) {
+        midTimeIntervals.add(key);
+      }
+    }
+
+    if (ext1 != null && ext2 != null && ext1 == 0 && ext2 == 0) {
+      print('scenario 11');
+      data = dataMap[timeIntervalEarly];
+      data0 = data;
+      data0TimeInterval = timeIntervalEarly;
+    } else if (ext1 != null && ext2 == null && ext1 == 1) {
+      print('scenario 22');
+      List dates = timeIntervalEarly.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, dates[1], date_fin);
+      // combine with dataMap[timeIntervalEarly]
+      dataMap['${dates[0]},${date_fin}'] = {
+        'result': dataMap[timeIntervalEarly]['result'] +
+            json.decode(halfData.body)['result']
+      };
+      dataMap.remove(timeIntervalEarly);
+      data = dataMap['${dates[0]},${date_fin}'];
+      data0 = data;
+      data0TimeInterval = '${dates[0]},${date_fin}';
+    } else if (ext1 == null && ext2 != null && ext2 == 1) {
+      print('scenario 33');
+      List dates = timeIntervalLate.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, date_deb, dates[0]);
+      // combine with dataMap[timeIntervalLate]
+      dataMap['${date_deb},${dates[1]}'] = {
+        'result': json.decode(halfData.body)['result'] +
+            dataMap[timeIntervalLate]['result']
+      };
+      dataMap.remove(timeIntervalLate);
+      data = dataMap['${date_deb},${dates[1]}'];
+      data0 = data;
+      data0TimeInterval = '${date_deb},${dates[1]}';
+    } else if (ext1 == null && ext2 == null) {
+      print('scenario 44');
+      var encodedData = await getMealsFromAPi2(
+          user_id, student_id, token, date_deb, date_fin);
+      dataMap['${date_deb},${date_fin}'] =
+          json.decode(encodedData.body);
+      data = dataMap['${date_deb},${date_fin}'];
+      data0 = data;
+      data0TimeInterval = "$date_deb,${date_fin}";
+    } else if (ext1 == 1 && ext2 == 1) {
+      print('scenario 55');
+      List dates = timeIntervalEarly.split(',');
+      List dates2 = timeIntervalLate.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, dates[1], dates2[0]);
+      // combine with dataMap[timeIntervalEarly] and dataMap[timeIntervalLate]
+      dataMap['${dates[0]},${dates2[1]}'] = {
+        'result': dataMap[timeIntervalEarly]['result'] +
+            json.decode(halfData.body)['result'] +
+            dataMap[timeIntervalLate]['result']
+      };
+      dataMap.remove(timeIntervalEarly);
+      dataMap.remove(timeIntervalLate);
+      data = dataMap['${dates[0]},${dates2[1]}'];
+      data0 = data;
+      data0TimeInterval = '${dates[0]},${dates2[1]}';
+    }
+
+    for (var elmnt in midTimeIntervals) {
+      print('scenario midmid');
+      // remove dataMap[elmnt] from dataMap
+      dataMap.remove(elmnt);
+    }
+    await storage.saveDataToSharedPrefrences(
+      data: json.encode(dataMap),
+      table: _tableName,
+    );
+
+
+
+
+    // final param = {
+    //   "user_id": "$user_id",
+    //   "student_id": "$student_id",
+    //   "auth_token": "$token",
+    //   "start_date": "$start_date",
+    //   "end_date": "$end_date",
+    //   // "meal_id": "$sel_id"
+    //   "meal_id": "all"
+    // };
+    //
+    // final mealsData = await http.post(
+    //   "${Config.url_api}/all_meals_calendar",
+    //   body: param,
+    // );
+    //
+    // setState(() {
+    //   data = json.decode(mealsData.body);
+    // });
+
+    /* Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => AllMealsCalendar(
+                data, widget._userId, widget._studentId, widget._token)));*/
+
+    // return mealsData;
+  }
+
+
   _showDialogDate() async {
     return await showDialog(
         context: context,
@@ -534,19 +1080,23 @@ class _MesReservationState extends State<Myreservations> {
   // flutter defined function
   bool check_all = false;
   var date_deb = DateFormat('yyyy-MM-dd')
-      .format(new DateTime.now().add(new Duration(days: 1)));
+      .format(new DateTime.now().add(new Duration(days: 0)));
   var date_fin = DateFormat('yyyy-MM-dd')
-      .format(new DateTime.now().add(new Duration(days: 200)));
+      .format(new DateTime.now().add(new Duration(days: 2)));
   String name_repas = "Tout";
 
   filter_meal() async {
     List a = await _showDialogDate();
+
+    print("********************Liste des repas");
+    print(a);
+    print("********************Liste des repas");
     if (a != null) {
       setState(() {
         loading = true;
       });
+      print("yess");
 
-      await get__Meals(a[0], a[1], a[2], a[3], a[4], a[5]);
 
       setState(() {
         date_deb = a[3];
@@ -554,6 +1104,7 @@ class _MesReservationState extends State<Myreservations> {
         name_repas = a[6];
       });
 
+      await get__Meals2(a[0], a[1], a[2], a[3], a[4], a[5]);
       await getMealsCal();
 
       setState(() {

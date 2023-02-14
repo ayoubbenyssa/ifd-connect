@@ -12,10 +12,12 @@ import 'package:ifdconnect/models/MealList.dart';
 import 'package:ifdconnect/models/Mealcal.dart';
 import 'package:ifdconnect/models/type_composant.dart';
 import 'package:ifdconnect/models/type_ropa.dart';
+import 'package:ifdconnect/restauration/servcies/localstorage_services.dart';
 import 'package:ifdconnect/services/Fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:ifdconnect/models/meal.dart';
 import 'package:ifdconnect/restauration/Resto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sticky_headers/sticky_headers.dart';
 
@@ -33,6 +35,7 @@ class AllReservations extends StatefulWidget {
 class _MesReservationState extends State<AllReservations> {
   final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
   var reservationData;
+  var annulationData;
   var dataDay;
   var data;
   List meals = [];
@@ -41,9 +44,9 @@ class _MesReservationState extends State<AllReservations> {
   String date;
   bool check_all = false;
   var date_deb = DateFormat('yyyy-MM-dd')
-      .format(new DateTime.now().add(new Duration(days: 1)));
+      .format(new DateTime.now().add(new Duration(days: 0)));
   var date_fin = DateFormat('yyyy-MM-dd')
-      .format(new DateTime.now().add(new Duration(days: 200)));
+      .format(new DateTime.now().add(new Duration(days: 2)));
   String name_repas = "Tout";
   var mealsmap = new SplayTreeMap<String, Object>();
   List<int> mealsTrue = [];
@@ -56,10 +59,19 @@ class _MesReservationState extends State<AllReservations> {
   Key keys;
   bool test22 = false ;
 
+  LocalStorageServices storage = LocalStorageServices();
+  String _tableName = "meals";
+  String _tableName1 = "allmeals";
+
   List<MealCal> mealCal =[];
   var composants_id;
   List Extra;
   List composont ;
+  var dataMap;
+  var data0;
+  var data0TimeInterval;
+  List dates = [];
+
 
 
   List mealcal =[
@@ -67,6 +79,7 @@ class _MesReservationState extends State<AllReservations> {
     {"extra" : []},
     {"composants" : []},
   ] ;
+
 
 
 
@@ -84,6 +97,9 @@ class _MesReservationState extends State<AllReservations> {
   //service pour annuler un repas
   Future<http.Response> makeCancel(
       int user_id, int student_id, int token, String ticketId) async {
+    setState(() {
+      loading = true;
+    });
     final param = {
       "user_id": "$user_id",
       "student_id": "$student_id",
@@ -97,23 +113,67 @@ class _MesReservationState extends State<AllReservations> {
     );
     setState(() {
       data = json.decode(reservationsData.body);
+      annulationData = data;
+      loading = false;
+
     });
 
     return reservationsData;
   }
 
   Future<List<Meal>> get_meals(int user_id, int student_id, int token) async {
+    // final param = {
+    //   "user_id": "$user_id",
+    //   "student_id": "$student_id",
+    //   "auth_token": "$token",
+    // };
+    // final reservationsData = await http.post(
+    //   "${Config.url_api}/meals",
+    //   body: param,
+    // );
+    // List list = [];
+    // if (this.mounted) {
+    //   setState(() {
+    //     list = json.decode(reservationsData.body)["meals"];
+    //   });
+    // }
+    // return list.map((contactRaw) => new Meal.fromDoc(contactRaw)).toList();
+
+    final resStorage = await _fetchAllMealsFromSharedPreferences();
+    print("^^^^^^^^^^1 get_meals");
+
+    if (resStorage != null) {
+      print("^^^^^^^^^^2 get_meals");
+
+      List list = json.decode(resStorage);
+      return list.map((contactRaw) => new Meal.fromDoc(contactRaw)).toList();
+    } else {
+      print("^^^^^^^^^^3 get_meals");
+
+      return await get_meals_fromapi(user_id, student_id, token);
+
+    }
+  }
+
+  Future<List<Meal>> get_meals_fromapi(
+      int user_id, int student_id, int token) async {
     final param = {
       "user_id": "$user_id",
       "student_id": "$student_id",
       "auth_token": "$token",
     };
-
     final reservationsData = await http.post(
       "${Config.url_api}/meals",
       body: param,
     );
+
     List list = [];
+
+
+    await storage.saveDataToSharedPrefrences(
+      data: json.encode(json.decode(reservationsData.body)["meals"]),
+      table: _tableName1,
+    );
     if (this.mounted) {
       setState(() {
         list = json.decode(reservationsData.body)["meals"];
@@ -128,6 +188,9 @@ class _MesReservationState extends State<AllReservations> {
   //service pour réserver un repas
   Future<http.Response> makeReservationConf(
       int user_id, int student_id, int token, String pmIds) async {
+    setState(() {
+      loading = true;
+    });
     final param = {
       "user_id": "$user_id",
       "student_id": "$student_id",
@@ -144,6 +207,8 @@ class _MesReservationState extends State<AllReservations> {
       reservationData = json.decode(restoData.body);
       setState(() {
         wait = false;
+        loading = false;
+
       });
     });
 
@@ -153,6 +218,8 @@ class _MesReservationState extends State<AllReservations> {
 
     return restoData;
   }
+
+
 
   void _showDialog() {
     showDialog(
@@ -198,7 +265,284 @@ class _MesReservationState extends State<AllReservations> {
     // flutter defined function
   }
 
+  // fetch services from sqlite
+  Future<String> _fetchMealsFromSharedPreferences() async {
+    print("_fetchMealsFromSharedPreferences");
+    print(storage.getDataFromSharedPreferences(table: _tableName));
+    return await storage.getDataFromSharedPreferences(table: _tableName);
+  }
+
+  // fetch services from sqlite
+  Future<String> _fetchAllMealsFromSharedPreferences() async {
+    return await storage.getDataFromSharedPreferences(table: _tableName1);
+  }
+  // fetch reservated meals
+  // Future<String> _fetchMyMealsFromSharedPreferences() async {
+  //   return await storage.getDataFromSharedPreferences(table: _tableName2);
+  // }
+
+  SharedPreferences prefs;
+
+
   Future<http.Response> getMeals(int user_id, int student_id, int token,
+      String start_date, String end_date) async {
+      print("getMeals");
+      final loadData = await storage.getBooleanDataFromSharedPreferences(
+        table: "resto_api_check");
+        print("getMeals loadData == ${loadData} ");
+
+    final resStorage = await _fetchMealsFromSharedPreferences();
+
+
+    print("***********************************************************************");
+
+      print("resStorage");
+      print(resStorage);
+
+      print("***********************************************************************");
+
+      //
+    //   prefs = await SharedPreferences.getInstance();
+    //   print("***************** getDataFromSharedPreferences allmeals");
+    //   print(prefs.getString("allmeals"));
+    //   final resStorage  = prefs.getString("allmeals") ;
+    //   print("***************** getDataFromSharedPreferences allmeals");
+    //   print(json.decode(resStorage));
+    //   print("***********************************************************************");
+
+    // final resStorage2 = await _fetchMyMealsFromSharedPreferences();
+    // final date = await storage.getDataFromSharedPreferences(
+    //     table: "resto_api_check_date");
+    // final dateD = await storage.getDataFromSharedPreferences(
+    //     table:
+    //         "resto_api_date_debut"); /*date_deb des données enregistrées localement */
+    // print("resStorage resStorage == ${json.decode(resStorage)} ");
+
+    final dateF = await storage.getDataFromSharedPreferences(table: "resto_api_date_fin");
+      print("dateF dateF 2 == ${dateF} ");
+      if (dateF != null) {
+      date_fin = dateF;
+      end_date = date_fin;
+    }
+
+    print("dateF dateF == ${dateF} ");
+
+// if(date!=null){
+    //   if(DateTime.parse(date.substring(0,10)).difference(DateTime.parse(date_fin)).inDays>0) {
+    //     date_fin = date.substring(0, 10);
+    //     end_date = date_fin;
+    //   }
+    // }
+
+    // if (resStorage2 != null) {
+    //   data2 = json.decode(resStorage2);
+    // }
+
+    // if (false) {
+
+    String timeIntervalEarly;
+    String timeIntervalLate;
+    List midTimeIntervals = [];
+    int ext1;
+    int ext2;
+    if (resStorage != null && loadData == false){
+      print("@@@@@@@@@@@@@@@@ 11");
+      dataMap = json.decode(resStorage);
+      print(dataMap);
+
+    } else
+      dataMap = {};
+    print("!!!!!!!");
+
+    for (String key in dataMap.keys) {
+      List dates = key.split(',');
+      // print("@@@@@@@@@@@@@@@@ 22");
+      //
+      // print(dates);
+      //
+      // print("DateTime.parse(dates[0]");
+      //
+      // print(DateTime.parse(dates[0]));
+      // print("DateTime.parse(dates[0]");
+      //
+      // print("date_deb" + date_deb);
+      // print("date_fin" + date_fin);
+
+
+
+      if (DateTime.parse(dates[0]).difference(DateTime.parse(date_deb)).inDays <= 0
+          &&
+          DateTime.parse(dates[1]).difference(DateTime.parse(date_fin)).inDays >= 0 ) {
+        // best case
+        timeIntervalEarly = key;
+        ext1 = ext2 = 0;
+        print("###1###");
+        break;
+      } else if (DateTime.parse(dates[0])
+          .difference(DateTime.parse(date_deb))
+          .inDays <=
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(date_deb))
+              .inDays >=
+              0) {
+        timeIntervalEarly = key;
+        ext1 = 1;
+        print("###2###");
+
+      } else if (DateTime.parse(dates[0])
+          .difference(DateTime.parse(addDays(date_deb, 31)))
+          .inDays <=
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(addDays(date_deb, 31)))
+              .inDays >=
+              0) {
+        timeIntervalLate = key;
+        ext2 = 1;
+        print("###3###");
+
+      }
+      if (DateTime.parse(dates[0]).difference(DateTime.parse(date_deb)).inDays >
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(addDays(date_deb, 31)))
+              .inDays <
+              0) {
+        midTimeIntervals.add(key);
+        print("###4###");
+
+      }
+    }
+
+    if (ext1 != null && ext2 != null && ext1 == 0 && ext2 == 0) {
+      print('scenario 1');
+      data = dataMap[timeIntervalEarly];
+      data0 = data;
+      data0TimeInterval = timeIntervalEarly;
+    } else if (ext1 != null && ext2 == null && ext1 == 1) {
+      print('scenario 2');
+      List dates = timeIntervalEarly.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, dates[1], addDays(date_deb, 31));
+      // combine with dataMap[timeIntervalEarly]
+      dataMap['${dates[0]},${addDays(date_deb, 31)}'] = {
+        'result': dataMap[timeIntervalEarly]['result'] +
+            json.decode(halfData.body)['result']
+      };
+      dataMap.remove(timeIntervalEarly);
+      data = dataMap['${dates[0]},${addDays(date_deb, 31)}'];
+      data0 = data;
+      data0TimeInterval = '${dates[0]},${addDays(date_deb, 31)}';
+    } else if (ext1 == null && ext2 != null && ext2 == 1) {
+      print('scenario 3');
+      List dates = timeIntervalLate.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, date_deb, dates[0]);
+      // combine with dataMap[timeIntervalLate]
+      dataMap['${date_deb},${dates[1]}'] = {
+        'result': json.decode(halfData.body)['result'] +
+            dataMap[timeIntervalLate]['result']
+      };
+      dataMap.remove(timeIntervalLate);
+      data = dataMap['${date_deb},${dates[1]}'];
+      data0 = data;
+      data0TimeInterval = '${date_deb},${dates[1]}';
+    } else if (ext1 == null && ext2 == null) {
+      print('scenario 4');
+      var encodedData = await getMealsFromAPi2(
+          user_id, student_id, token, date_deb, addDays(date_deb, 31));
+      dataMap['${date_deb},${addDays(date_deb, 31)}'] =
+          json.decode(encodedData.body);
+      data = dataMap['${date_deb},${addDays(date_deb, 31)}'];
+      data0 = data;
+      data0TimeInterval = "$date_deb,${addDays(date_deb, 31)}";
+      print('fin scenario 4');
+
+    } else if (ext1 == 1 && ext2 == 1) {
+      print('scenario 5');
+      List dates = timeIntervalEarly.split(',');
+      List dates2 = timeIntervalLate.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, dates[1], dates2[0]);
+      // combine with dataMap[timeIntervalEarly] and dataMap[timeIntervalLate]
+      dataMap['${dates[0]},${dates2[1]}'] = {
+        'result': dataMap[timeIntervalEarly]['result'] +
+            json.decode(halfData.body)['result'] +
+            dataMap[timeIntervalLate]['result']
+      };
+      dataMap.remove(timeIntervalEarly);
+      dataMap.remove(timeIntervalLate);
+      data = dataMap['${dates[0]},${dates2[1]}'];
+      data0 = data;
+      data0TimeInterval = '${dates[0]},${dates2[1]}';
+    }
+
+    for (var elmnt in midTimeIntervals) {
+      print('scenario mid');
+      // remove dataMap[elmnt] from dataMap
+      dataMap.remove(elmnt);
+    }
+    await storage.saveDataToSharedPrefrences(
+      data: json.encode(dataMap),
+      table: _tableName,
+    );
+
+    //
+
+    // if (resStorage != null &&
+    //     loadData == false &&
+    //     dateD == date_deb &&
+    //     !(date != null &&
+    //         DateTime.parse(date.substring(0, 10))
+    //                 .difference(DateTime.parse(dateF))
+    //                 .inDays >
+    //             0)) {
+    //   print('yaasalam');
+    //   data = json.decode(resStorage);
+    //   data0 = data;
+    //   return null;
+    // } else {
+    //   print('yaasalam2');
+    //   if (date != null) {
+    //     if (DateTime.parse(date.substring(0, 10))
+    //             .difference(DateTime.parse(date_fin))
+    //             .inDays >
+    //         0) {
+    //       date_fin = date.substring(0, 10);
+    //       end_date = date_fin;
+    //     }
+    //   }
+    //   return await getMealsFromAPi(
+    //       user_id, student_id, token, start_date, addDays(date_fin, 31));
+    // }
+
+    // final param = {
+    //   "user_id": "$user_id",
+    //   "student_id": "$student_id",
+    //   "auth_token": "$token",
+    //   "start_date": "$start_date",
+    //   "end_date": "$end_date",
+    //   "meal_id": "all",
+    //   "is_reserved": "all"
+    // };
+    //
+    // final mealsData = await http.post(
+    //   "${Config.url_api}/all_meals_calendar",
+    //   body: param,
+    // );
+    //
+    // // print(mealsData.body);
+    //
+    // if (this.mounted)
+    //   setState(() {
+    //     data = json.decode(mealsData.body);
+    //   });
+    //
+    // return mealsData;
+  }
+
+  Future<http.Response> getMealsFromAPi2(int user_id, int student_id, int token,
       String start_date, String end_date) async {
     final param = {
       "user_id": "$user_id",
@@ -209,14 +553,15 @@ class _MesReservationState extends State<AllReservations> {
       "meal_id": "all",
       "is_reserved": "all"
     };
+    // "start_date": "2022-11-05",
+    // "end_date": "2023-05-05",
+    print("user_id == ${user_id}");
+    print("student_id == ${student_id}");
+    print("auth_token == ${token}");
+    print("start_date == ${start_date}");
+    print("end_date == ${end_date}");
 
-    print("______________________________________");
-    print(user_id);
-    print(student_id);
-    print(token);
-    print(start_date);
-    print(end_date);
-    print("______________________________________");
+
 
     final mealsData = await http.post(
       "${Config.url_api}/all_meals_calendar",
@@ -242,6 +587,77 @@ class _MesReservationState extends State<AllReservations> {
     // mealCal = data.map
     return mealsData;
   }
+
+
+  Future<http.Response> getMealsFromAPi(int user_id, int student_id, int token,
+      String start_date, String end_date) async {
+    final param = {
+      "user_id": "$user_id",
+      "student_id": "$student_id",
+      "auth_token": "$token",
+      "start_date": "$start_date",
+      "end_date": "$end_date",
+      "meal_id": "all",
+      "is_reserved": "all"
+    };
+
+    final mealsData = await http.post(
+      "${Config.url_api}/api/all_meals_calendar",
+      body: param,
+    );
+
+    // update
+    var encodedData =
+    await storage.getDataFromSharedPreferences(table: _tableName);
+    var decodedData;
+    if (encodedData != null) {
+      decodedData = json.decode(encodedData);
+      decodedData['$start_date-$end_date'] = mealsData.body;
+    } else
+      decodedData = {'$start_date-$end_date': mealsData.body};
+
+    await storage.saveDataToSharedPrefrences(
+      data: json.encode(decodedData),
+      table: _tableName,
+    );
+
+    // List dataList = await storage.getListStringDataFromSharedPreferences(table: _tableName);
+    // var dataToSave = {
+    //   'time interval': '$start_date-$end_date',
+    //   'data' : mealsData.body
+    // };
+    //
+    // await storage.saveListStringDataToSharedPrefrences(
+    //   data: dataList + [json.encode(dataToSave)],
+    //   table: _tableName,
+    // );
+
+    // await storage.saveDataToSharedPrefrences(
+    //   data: mealsData.body,
+    //   table: _tableName,
+    // );
+
+    print("------------------------------------");
+    if (this.mounted)
+      setState(() {
+        data = json.decode(mealsData.body);
+      });
+    data0 = data;
+    storage.saveBooleanDataToSharedPrefrences(
+        table: "resto_api_check", data: false);
+    // won't need resto_api_date_debut and resto_api_date_fin in this update
+    storage.saveDataToSharedPrefrences(
+        table: "resto_api_date_debut", data: start_date);
+    storage.saveDataToSharedPrefrences(
+        table: "resto_api_date_fin", data: end_date);
+    // print('here0');
+    // print(data0);
+    // print('here1');
+    // print(data2);
+
+    return mealsData;
+  }
+
 
   getMealsCal() {
     for (var i = 0; i < data["result"].length; i++) {
@@ -310,6 +726,7 @@ class _MesReservationState extends State<AllReservations> {
 
     getKey();
     loading = false;
+    print("getMealsCal fin");
   }
 
   getKey() {
@@ -340,6 +757,7 @@ class _MesReservationState extends State<AllReservations> {
     // print("test date ====${DateTime.fromMillisecondsSinceEpoch(1653562444 * 1000)}");
     print("test date ====${DateFormat('yyyy-MM-dd').format(DateTime.fromMillisecondsSinceEpoch(1653562444 * 1000))}");
 
+    print("initState");
 
     String today = DateTime.now().add(new Duration(days: -90)).toString();
 
@@ -452,6 +870,167 @@ class _MesReservationState extends State<AllReservations> {
     return mealsData;
   }
 
+  Future get__Meals2(int user_id, int student_id, int token,
+      String start_date, String end_date, sel_id) async {
+    meals = [];
+    listmeals = [];
+    mealsmap = new SplayTreeMap<String, Object>();
+    mealsTrue = [];
+    listKey = [];
+
+    String timeIntervalEarly;
+    String timeIntervalLate;
+    List midTimeIntervals = [];
+    int ext1;
+    int ext2;
+
+    for (String key in dataMap.keys) {
+      List dates = key.split(',');
+      if (DateTime.parse(dates[0])
+          .difference(DateTime.parse(date_deb))
+          .inDays <=
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(date_fin))
+              .inDays >=
+              0) {
+        // best case
+        timeIntervalEarly = key;
+        ext1 = ext2 = 0;
+        break;
+      } else if (DateTime.parse(dates[0])
+          .difference(DateTime.parse(date_deb))
+          .inDays <=
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(date_deb))
+              .inDays >=
+              0) {
+        timeIntervalEarly = key;
+        ext1 = 1;
+      } else if (DateTime.parse(dates[0])
+          .difference(DateTime.parse(date_fin))
+          .inDays <=
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(date_fin))
+              .inDays >=
+              0) {
+        timeIntervalLate = key;
+        ext2 = 1;
+      }
+      if (DateTime.parse(dates[0]).difference(DateTime.parse(date_deb)).inDays >
+          0 &&
+          DateTime.parse(dates[1])
+              .difference(DateTime.parse(date_fin))
+              .inDays <
+              0) {
+        midTimeIntervals.add(key);
+      }
+    }
+
+    if (ext1 != null && ext2 != null && ext1 == 0 && ext2 == 0) {
+      print('scenario 11');
+      data = dataMap[timeIntervalEarly];
+      data0 = data;
+      data0TimeInterval = timeIntervalEarly;
+    } else if (ext1 != null && ext2 == null && ext1 == 1) {
+      print('scenario 22');
+      List dates = timeIntervalEarly.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, dates[1], date_fin);
+      // combine with dataMap[timeIntervalEarly]
+      dataMap['${dates[0]},${date_fin}'] = {
+        'result': dataMap[timeIntervalEarly]['result'] +
+            json.decode(halfData.body)['result']
+      };
+      dataMap.remove(timeIntervalEarly);
+      data = dataMap['${dates[0]},${date_fin}'];
+      data0 = data;
+      data0TimeInterval = '${dates[0]},${date_fin}';
+    } else if (ext1 == null && ext2 != null && ext2 == 1) {
+      print('scenario 33');
+      List dates = timeIntervalLate.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, date_deb, dates[0]);
+      // combine with dataMap[timeIntervalLate]
+      dataMap['${date_deb},${dates[1]}'] = {
+        'result': json.decode(halfData.body)['result'] +
+            dataMap[timeIntervalLate]['result']
+      };
+      dataMap.remove(timeIntervalLate);
+      data = dataMap['${date_deb},${dates[1]}'];
+      data0 = data;
+      data0TimeInterval = '${date_deb},${dates[1]}';
+    } else if (ext1 == null && ext2 == null) {
+      print('scenario 44');
+      var encodedData = await getMealsFromAPi2(
+          user_id, student_id, token, date_deb, date_fin);
+      dataMap['${date_deb},${date_fin}'] =
+          json.decode(encodedData.body);
+      data = dataMap['${date_deb},${date_fin}'];
+      data0 = data;
+      data0TimeInterval = "$date_deb,${date_fin}";
+    } else if (ext1 == 1 && ext2 == 1) {
+      print('scenario 55');
+      List dates = timeIntervalEarly.split(',');
+      List dates2 = timeIntervalLate.split(',');
+      var halfData = await getMealsFromAPi2(
+          user_id, student_id, token, dates[1], dates2[0]);
+      // combine with dataMap[timeIntervalEarly] and dataMap[timeIntervalLate]
+      dataMap['${dates[0]},${dates2[1]}'] = {
+        'result': dataMap[timeIntervalEarly]['result'] +
+            json.decode(halfData.body)['result'] +
+            dataMap[timeIntervalLate]['result']
+      };
+      dataMap.remove(timeIntervalEarly);
+      dataMap.remove(timeIntervalLate);
+      data = dataMap['${dates[0]},${dates2[1]}'];
+      data0 = data;
+      data0TimeInterval = '${dates[0]},${dates2[1]}';
+    }
+
+    for (var elmnt in midTimeIntervals) {
+      print('scenario midmid');
+      // remove dataMap[elmnt] from dataMap
+      dataMap.remove(elmnt);
+    }
+    await storage.saveDataToSharedPrefrences(
+      data: json.encode(dataMap),
+      table: _tableName,
+    );
+
+
+
+
+    // final param = {
+    //   "user_id": "$user_id",
+    //   "student_id": "$student_id",
+    //   "auth_token": "$token",
+    //   "start_date": "$start_date",
+    //   "end_date": "$end_date",
+    //   // "meal_id": "$sel_id"
+    //   "meal_id": "all"
+    // };
+    //
+    // final mealsData = await http.post(
+    //   "https://lgi.iav.ac.ma/api/all_meals_calendar",
+    //   body: param,
+    // );
+    //
+    // setState(() {
+    //   data = json.decode(mealsData.body);
+    // });
+
+    /* Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => AllMealsCalendar(
+                data, widget._userId, widget._studentId, widget._token)));*/
+
+    // return mealsData;
+  }
+
   _showDialogDate() async {
     return await showDialog(
         context: context,
@@ -513,7 +1092,7 @@ class _MesReservationState extends State<AllReservations> {
         name_repas = a[6];
       });
 
-      await get__Meals(a[0], a[1], a[2], a[3], a[4], a[5]);
+      await get__Meals2(a[0], a[1], a[2], a[3], a[4], a[5]);
       await getMealsCal();
 
       setState(() {
@@ -787,6 +1366,18 @@ class _MesReservationState extends State<AllReservations> {
         setState(() {
           wait = true;
         });
+
+        String dateModif;
+        dateModif =  hgf`[0];
+        if (dates.length > 1) {
+          for (int i = 1; i < dates.length; i++) {
+            if (DateTime.parse(dates[i])
+                .difference(DateTime.parse(dateModif))
+                .inDays >
+                0) dateModif = dates[i];
+          }
+        }
+
         makeReservationConf(widget._userId, widget._studentId, widget._token,
             priceIds.join(","))
             .then((val) {
@@ -826,177 +1417,103 @@ class _MesReservationState extends State<AllReservations> {
 
     // TODO: implement build
     return Scaffold(
-      appBar: listKey.isNotEmpty
-          ? AppBar(
-        // titleSpacing: 0.0,
-        elevation: 0.0,
-        backgroundColor: Colors.white,
-        leading: Container(
-            padding: EdgeInsets.only(
-                left: 28.0,
-                top: 10
+        appBar:
+        // listKey.isNotEmpty
+        //     ?
+        AppBar(
+          // titleSpacing: 0.0,
+            elevation: 0.0,
+            backgroundColor: Colors.white,
+            leading: Container(
+                padding: EdgeInsets.only(
+                  left: 28.0,
+                ),
+                child: new Checkbox(
+                  value: check_all,
+                  onChanged: (value) {
+                    change(value);
+                  },
+                )),
+            actions: wait == true
+            ? [CupertinoActivityIndicator(), Container(width: 24)]
+                : <Widget>[
+            RaisedButton(
+            color: Colors.green[400],
+            padding: EdgeInsets.all(0),
+            onPressed: () {
+              reserve(context);
+            },
+            child: Text(
+              "Réserver",
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16.0,
+                  fontWeight: FontWeight.w500),
+            )),
+        RaisedButton(
+            color: Colors.red,
+            padding: EdgeInsets.all(0),
+            child: Text(
+              "Annuler",
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16.0,
+                  fontWeight: FontWeight.w600),
             ),
-            child:
-            // InkWell(
-            //   child: Container(
-            //     height: 18.h,
-            //     width: 18.h,
-            //     decoration: BoxDecoration(
-            //       border: Border.all(color: Fonts.border_col,style: BorderStyle.solid),
-            //       borderRadius: BorderRadius.all(Radius.circular(4.r))
-            //     ),
-            //     child: check_all == true ?  Center(child: Icon(Icons.check, size: 13.r,color: Fonts.col_app_grey,)) :Container(),
-            //   ),
-            //   onTap: (){
-            //     print(check_all);
-            //     change(check_all);
-            //     print(check_all);
-            //   },
-            // ),
-
-            new Checkbox(
-              splashRadius: 10.r,
-              value: check_all,
-              onChanged: (value) {
-                print(check_all);
-
-                change(value);
-
-                print(check_all);
-
-              },
-            )
-        ),
-        toolbarHeight: 170.h,
-
-        actions: wait == true
-        ? [CupertinoActivityIndicator(), Container(width: 24.w)]
-        : <Widget>[
+            onPressed: () {
+              annuler();
+            })
         ],
         titleSpacing: 2.0,
-        title: Row(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Text(
-                "Sélectionner tous",
-                style: TextStyle(
-                    color: Fonts.col_app_grey,
-                    fontSize: 12.0.sp),
-              ),
-            ),
-            Expanded(child: Container()),
-            ButtonTheme(
-                minWidth: 65.0.w,
-                height: 27.0.h,
-                child:
-                RaisedButton(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                    color: Fonts.col_green,
-                    padding: EdgeInsets.all(0),
-                    onPressed: () {
-                      reserve(context);
-                    },
-                    child: Text(
-                      "Réserver",
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12.0.sp,
-                          fontWeight: FontWeight.w500),
-                    ))
-            ),
-            SizedBox(width: 10.w,),
-            Container(
-                width: 65.0.w,
-                height: 27.0.h,
-                child:
-                RaisedButton(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14.r)),
-                    color: Fonts.col_app_red,
-                    padding: EdgeInsets.all(0),
-                    child: Text(
-                      "Annuler",
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12.0.sp,
-                          fontWeight: FontWeight.w600),
-                    ),
-                    onPressed: () {
-                      annuler();
-                    })
-            ),
-            SizedBox(width: 22.w,),
-          ],
-
+        title: Text(
+          "Sélectionner tous",
+          style: TextStyle(color: Colors.grey[600], fontSize: 12.0),
         ),
-        bottom: listKey.isNotEmpty
-            ? preferredSize(ScreenUtil().setHeight(108.0.h))
-            : PreferredSize(preferredSize: Size.fromHeight(0.1.h)),
-      )
+        bottom:
+        // listKey.isNotEmpty
+        //     ?
+        preferredSize(ScreenUtil().setHeight(108.0))
+      // : PreferredSize(preferredSize: Size.fromHeight(0.1)),
+    )
+    // : PreferredSize(
+    //     preferredSize: Size.fromHeight(1),
+    //     child: Container(width: 0.0, height: 0.0))
 
-          : PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Container(width: 0.0, height: 0.0))
-
-      /*elevation: 0,
+    /*elevation: 0,
               backgroundColor: Colors.white,
               iconTheme: IconThemeData(color: Colors.white),
               bottom: preferredSize(20.0),*/
-      ,
-      // floatingActionButton: FloatingActionButton(
-      //   heroTag: null,
-      //   highlightElevation: 7.0,
-      //
-      //   elevation: 0.0,
-      //   //iconSize: 62,
-      // backgroundColor: Fonts.col_app,
-      // onPressed: () {
-      // /*
-      //
-      //       [  widget._userId,
-      //                     widget._studentId,
-      //                     widget._token,
-      //                     _formaterDate(date_debut),
-      //                     _formaterDate(date_fin),sel_id]
-      //        */
-      //   print("fillter");
-      //
-      // filter_meal();
-      // },
-      // child: Container(
-      // decoration: BoxDecoration(
-      // color: Fonts.col_app,
-      // borderRadius: BorderRadius.all(Radius.circular(14.r))
-      // ),
-      // width: 60.w,
-      // height: 60.h,
-      // child: Padding(
-      // padding: EdgeInsets.all(8),
-      //     child: Icon(Icons.add, color: Colors.white, size: 40.r)),
-      //
-      // ),
-      // ),
-      key: _scaffoldKey,
-      body: loading
-          ? Container(
-        color: Colors.white,
-        child: Center(
-          child: CircularProgressIndicator(),
-        ),
-      )
-          : listKey.isNotEmpty
-          ? Container(
-        color: Colors.white,
-        child: new ListView.builder(
-            itemCount: listmeals[0].length,
-            itemBuilder: (context, index) {
-              return _builBatchList(listKey[index]);
-            }),
-      )
-          : Container(    color: Colors.white,
-          child: Center(child: Text("Aucune réservation !"))),
+    ,
+    floatingActionButton: FloatingActionButton(
+    backgroundColor: Fonts.col_app,
+    onPressed: () {
+    /*
+
+          [  widget._userId,
+                        widget._studentId,
+                        widget._token,
+                        _formaterDate(date_debut),
+                        _formaterDate(date_fin),sel_id]
+           */
+
+    filter_meal();
+    },
+    child: Icon(
+    Icons.add,
+    ),
+    ),
+    key: _scaffoldKey,
+    body: loading
+    ? Center(
+    child:Container(child: Text("loading ==${loading}"),),
+    )
+        : listKey.isNotEmpty
+    ? new ListView.builder(
+    itemCount: listmeals[0].length,
+    itemBuilder: (context, index) {
+    return _builBatchList(listKey[index]);
+    })
+        : Center(child: Text("Aucune réservation !")),
     );
   }
 
@@ -1119,6 +1636,8 @@ class _MesReservationState extends State<AllReservations> {
   }*/
 
   Widget _builBatchList(String dd) {
+
+    print("dd  == ${dd}");
     Widget timeCards;
     List<MealCal> vv = [];
     listmeals[0][dd].forEach((val) {

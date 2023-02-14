@@ -93,12 +93,12 @@ class RestoAccuielState extends State<RestoAccuiel>
           color: Fonts.col_app,
           child: Row(
             children: [
-              Image.asset(
-                "images/resturation.png",
-                color: Colors.white,
-                width: 23.5.w,
-                height: 25.5.h,
-              ),              Container(width: 7.w,),
+              // Image.asset(
+              //   "images/resturation.png",
+              //   color: Colors.white,
+              //   width: 23.5.w,
+              //   height: 25.5.h,
+              // ),              Container(width: 7.w,),
               Padding(
                 padding: const EdgeInsets.only(top: 10,bottom:10),
                 child: Text(

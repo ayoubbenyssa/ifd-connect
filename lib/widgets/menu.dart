@@ -119,6 +119,9 @@ class _MenuState extends State<Menu> {
     );
 
     var resBody = json.decode(loginData.body);
+    resBody['student_data']['user'] = json.decode(resBody['student_data']['user']);
+    prefs.setBool("resto_api_check", resBody['student_data']['user']['resto_api_check']??false) ;
+    prefs.setString("resto_api_check_date", resBody['student_data']['user']['resto_api_check_date']??null) ;
     prefs.setInt("token_user", resBody["auth_token"]);
     token_user = prefs.getInt("token_user");
 
@@ -126,6 +129,7 @@ class _MenuState extends State<Menu> {
   }
 
   verify_login_campus() async {
+    print("verify_login_campus");
     prefs = await SharedPreferences.getInstance();
     token_user = prefs.getInt("token_user");
 
@@ -244,7 +248,8 @@ class _MenuState extends State<Menu> {
   @override
   void initState() {
     super.initState();
-    if (widget.user.role.id != "9UHbnUrotk") verify_login_campus();
+    if (widget.user.role.id != "9UHbnUrotk")
+      verify_login_campus();
   }
 
   campus() async {

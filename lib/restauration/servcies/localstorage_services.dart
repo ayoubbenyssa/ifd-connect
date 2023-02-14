@@ -1,9 +1,10 @@
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalStorageServices {
   SharedPreferences prefs;
+
+
   getprefs() async{
     prefs = await SharedPreferences.getInstance();
 
@@ -15,6 +16,15 @@ class LocalStorageServices {
       prefs = await SharedPreferences.getInstance();
 
       await prefs.setString(table, data);
+    } catch (e) {
+      debugPrint("---> Error saving data to shared preferences : $e");
+    }
+  }
+  Future<void> saveListStringDataToSharedPrefrences({@required String table, @required List<String> data}) async {
+    try {
+      prefs = await SharedPreferences.getInstance();
+
+      await prefs.setStringList(table, data);
     } catch (e) {
       debugPrint("---> Error saving data to shared preferences : $e");
     }
@@ -33,13 +43,25 @@ class LocalStorageServices {
   Future<String> getDataFromSharedPreferences({@required String table}) async {
     try {
       prefs = await SharedPreferences.getInstance();
+      print("***************** getDataFromSharedPreferences ${table}");
+      print(prefs.getString(table));
+      print("***************** getDataFromSharedPreferences ${table}");
+
       return prefs.getString(table);
     } catch (e) {
       debugPrint("---> Error getting data from shared preferences : $e");
       return null;
     }
   }
-
+  Future<List<String>> getListStringDataFromSharedPreferences({@required String table}) async {
+    try {
+      prefs = await SharedPreferences.getInstance();
+      return prefs.getStringList(table);
+    } catch (e) {
+      debugPrint("---> Error getting data from shared preferences : $e");
+      return null;
+    }
+  }
   Future<bool> getBooleanDataFromSharedPreferences({@required String table}) async {
     try {
       prefs = await SharedPreferences.getInstance();

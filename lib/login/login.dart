@@ -336,8 +336,13 @@ class _LoginState extends State<Login1> {
     );
 
     var resBody = json.decode(loginData.body);
-
     print(resBody);
+
+
+    resBody['student_data']['user'] = json.decode(resBody['student_data']['user']);
+    prefs.setBool("resto_api_check", resBody['student_data']['user']['resto_api_check']??false) ;
+    prefs.setString("resto_api_check_date", resBody['student_data']['user']['resto_api_check_date']??null) ;
+
     if (resBody["status"] == 1) {
       setState(() {
         _authHint = "";

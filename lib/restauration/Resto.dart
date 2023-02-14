@@ -10,7 +10,6 @@ import 'dart:convert';
 import 'all_meals_calendar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-
 class ListMeals extends StatefulWidget {
   final int _userId;
   final int _studentId;
@@ -126,7 +125,6 @@ class _ListMealsState extends State<ListMeals> {
       margin: EdgeInsets.only(top: 0),
       padding: EdgeInsets.only(top: 0),
       height: 220.0.h,
-      // color: Colors.red,
       child: Scaffold(
           backgroundColor: Colors.transparent,
           //appBar: AppBar(title: Text("test")),

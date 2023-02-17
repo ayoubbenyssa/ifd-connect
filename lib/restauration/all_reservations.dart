@@ -1368,7 +1368,7 @@ class _MesReservationState extends State<AllReservations> {
         });
 
         String dateModif;
-        dateModif =  hgf`[0];
+        dateModif =  date[0];
         if (dates.length > 1) {
           for (int i = 1; i < dates.length; i++) {
             if (DateTime.parse(dates[i])

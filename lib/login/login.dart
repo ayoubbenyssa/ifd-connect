@@ -324,29 +324,67 @@ class _LoginState extends State<Login1> {
   }*/
 
   auth_api_school(String identifiant, String password) async {
+
+    prefs = await SharedPreferences.getInstance();
+
+    print("#####################");
+    print(identifiant.toString());
+    print(password.toString());
+    print("${prefs.getString('api_url')}");
+
+
+
     final param = {
       "username": identifiant.toString().toLowerCase().replaceAll(" ", ""),
       "password": password
     };
     prefs = await SharedPreferences.getInstance();
-//http://ifd-erp.tk http://ifd-erp.tk
+    //http://ifd-erp.tk http://ifd-erp.tk
     final loginData = await http.post(
-      "${Config.url_api}/login",
-      body: param,
+      "${"${prefs.getString('api_url')}"}/login",
+        body: json.encode(param),
+      headers: {
+        "content-type": "application/json",
+      //  "Accept": "application/json",
+        "User-Agent": "Flutter HTTP",
+        "Connection": "keep-alive",
+        "Cache-Control": "no-cache"
+      }
     );
 
-    var resBody = json.decode(loginData.body);
+    print("%%%%%%%%%%%%----------%%%%%%%%%");
+
+
+    print(loginData.body);
+
+    var resBody = json.decode(loginData.body.toString());
+    print("%%%%%%%%%%%%%%%%%%%%%");
     print(resBody);
+    print("!@@!@@!@@!@!@!@!@@!@!@!");
+
+    // print(json.decode(resBody["student_data"]["user"].toString()));
+    // print("%%%%%%%%%%%%%%%%%%%%%");
 
 
-    resBody['student_data']['user'] = json.decode(resBody['student_data']['user']);
-    prefs.setBool("resto_api_check", resBody['student_data']['user']['resto_api_check']??false) ;
-    prefs.setString("resto_api_check_date", resBody['student_data']['user']['resto_api_check_date']??null) ;
 
     if (resBody["status"] == 1) {
+
       setState(() {
         _authHint = "";
       });
+
+      if(resBody.containsKey("employee_data")){
+
+        resBody['employee_data']['user'] = json.decode(resBody['employee_data']['user']);
+        prefs.setBool("resto_api_check", resBody['employee_data']['user']['resto_api_check']??false) ;
+        prefs.setString("resto_api_check_date", resBody['employee_data']['user']['resto_api_check_date']??null) ;
+
+      }else{
+        resBody['student_data']['user'] = json.decode(resBody['student_data']['user']);
+        prefs.setBool("resto_api_check", resBody['student_data']['user']['resto_api_check']??false) ;
+        prefs.setString("resto_api_check_date", resBody['student_data']['user']['resto_api_check_date']??null) ;
+
+      }
 
       if (resBody["type"] != widget.role.type) {
         setState(() {
@@ -366,7 +404,9 @@ class _LoginState extends State<Login1> {
           if (resBody.containsKey("employee_data")) {
             print(widget.role.id);
 
-            js = json.decode(resBody["employee_data"]["user"]);
+            js =  resBody["employee_data"]["user"] ;
+
+            // js = json.decode(resBody["employee_data"]["user"]);
 
             info = InfoUser(
                 first_name: js["first_name"],
@@ -381,9 +421,20 @@ class _LoginState extends State<Login1> {
                 user_id: resBody["user_id"],
                 last_name: js["last_name"]);
           } else {
-            js = json.decode(resBody["student_data"]["user"]);
+            // print("@@@@@@@@@@@");
+            // print(resBody["student_data"]["user"]);
+            // print("@@@@@111@@@@@@");
+            //
+            // print(json.decode(resBody["student_data"]["user"].toString()));
+            // print("@@@@@222@@@@@@");
+
+
+
+            js =  resBody["student_data"]["user"] ;
+            // print("@@@@@@@@@@@1111");
+
             info = InfoUser(
-                first_name: js["first_name"],
+                first_name: js["first_name"].toString(),
                 // employee_id: ,
                 email: js["email"],
                 auth_token: resBody["auth_token"],
